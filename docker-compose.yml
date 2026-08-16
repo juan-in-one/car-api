@@ -1,0 +1,31 @@
+# Solo para desarrollo local rápido, antes de tener el clúster de Kubernetes con
+# el Postgres compartido de la plataforma (ver wiki/projects/juan-in-one.md).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: car_api
+      POSTGRES_PASSWORD: car_api
+      POSTGRES_DB: car_api
+    ports:
+      - "5432:5432"
+    volumes:
+      - car_api_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U car_api"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://car_api:car_api@db:5432/car_api
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  car_api_db:
