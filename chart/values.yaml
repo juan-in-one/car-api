@@ -1,0 +1,37 @@
+image:
+  repository: ghcr.io/juan-in-one/car-api
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Ignorado si autoscaling.enabled es true (el HPA manda en ese caso)
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: nginx
+  host: car-api.local
+  path: /
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# Valor de desarrollo, igual al de .env.example. NO usar en real: la gestión de
+# secretos de verdad (Sealed Secrets / External Secrets / SOPS) llega en un paso
+# posterior del roadmap (ArgoCD + gestión de secretos).
+secret:
+  databaseUrl: "postgresql+asyncpg://car_api:car_api@localhost:5432/car_api"
