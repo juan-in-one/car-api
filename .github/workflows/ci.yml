@@ -48,6 +48,29 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Semgrep — análisis estático del código (SAST)
+        # A diferencia de Trivy (versiones vulnerables / config), Semgrep lee
+        # la estructura real del código Python en busca de patrones inseguros
+        # conocidos (SQL injection, deserialización insegura, CORS mal
+        # configurado...). Reglas OSS gratuitas, sin cuenta ni API key.
+        run: |
+          pip install --quiet semgrep
+          semgrep scan \
+            --config p/security-audit \
+            --config p/python \
+            --text --output semgrep.txt \
+            app/
+
+      - name: Volcar hallazgos de Semgrep al resumen del job
+        if: always()
+        run: |
+          {
+            echo "## 🔎 Semgrep — análisis estático del código (SAST)"
+            echo '```'
+            cat semgrep.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Autenticarse en GHCR
         # Solo publicamos imagen cuando el trigger es un push (no en PRs, para
         # no llenar el registro de imágenes de ramas que aún no se han fusionado).
