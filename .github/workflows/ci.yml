@@ -175,6 +175,9 @@ jobs:
           target: "http://localhost:8000/docs"
           cmd_options: "-a -r zap-report.html -w zap-report.md"
           fail_action: false # informativo por ahora, igual que Trivy/Semgrep
+          # Por defecto la Action intenta abrir un Issue de GitHub con los
+          # hallazgos; lo desactivamos porque ya los volcamos al Job Summary.
+          allow_issue_writing: false
 
       - name: Volcar hallazgos de ZAP al resumen del job
         if: always()
