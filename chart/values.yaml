@@ -22,6 +22,21 @@ autoscaling:
   maxReplicas: 3
   targetCPUUtilizationPercentage: 70
 
+# Hardening pedido por Trivy config (KSV-0001/0003/0004/0012/0014/0020/0021/
+# 0030/0104/0106/0118) — mismo UID/GID que crea el Dockerfile (10001).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
 resources:
   requests:
     cpu: 100m
