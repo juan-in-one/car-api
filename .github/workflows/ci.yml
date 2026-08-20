@@ -7,12 +7,10 @@ on:
     branches: [main]
 
 # Permiso explícito para que el GITHUB_TOKEN automático de esta ejecución
-# pueda publicar paquetes (imágenes) en GHCR y subir hallazgos de Trivy a la
-# pestaña "Security" del repo. Por defecto viene en solo lectura.
+# pueda publicar paquetes (imágenes) en GHCR. Por defecto viene en solo lectura.
 permissions:
   contents: read
   packages: write
-  security-events: write
 
 env:
   REGISTRY: ghcr.io
@@ -29,19 +27,26 @@ jobs:
         # "config" analiza IaC: malas prácticas de seguridad en el propio
         # Dockerfile y en el chart de Helm (Trivy renderiza el chart él solo,
         # no hace falta pasarle el YAML ya generado a mano).
+        # Salida en tabla en vez de SARIF: la pestaña "Security" de GitHub
+        # (Code Scanning) requiere Advanced Security, que no está disponible
+        # en repos privados con plan Free — ver wiki/projects/juan-in-one.md.
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: .
-          format: sarif
-          output: trivy-config.sarif
+          format: table
+          output: trivy-config.txt
           exit-code: "0" # no bloquea main todavía, ver comentario más abajo
 
-      - name: Subir hallazgos de configuración a la pestaña Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-config.sarif
-          category: trivy-config
+      - name: Volcar hallazgos de configuración al resumen del job
+        if: always()
+        run: |
+          {
+            echo "## 🛡️ Trivy — configuración (Dockerfile + chart)"
+            echo '```'
+            cat trivy-config.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Autenticarse en GHCR
         # Solo publicamos imagen cuando el trigger es un push (no en PRs, para
@@ -81,12 +86,16 @@ jobs:
         with:
           scan-type: image
           image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
-          format: sarif
-          output: trivy-image.sarif
+          format: table
+          output: trivy-image.txt
           exit-code: "0" # no bloquea main todavía, ver comentario más abajo
 
-      - name: Subir hallazgos de la imagen a la pestaña Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-image.sarif
-          category: trivy-image
+      - name: Volcar hallazgos de la imagen al resumen del job
+        if: always()
+        run: |
+          {
+            echo "## 🛡️ Trivy — vulnerabilidades de la imagen"
+            echo '```'
+            cat trivy-image.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
