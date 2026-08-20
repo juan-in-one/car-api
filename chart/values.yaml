@@ -3,6 +3,11 @@ image:
   tag: "latest"
   pullPolicy: IfNotPresent
 
+# Vacío por defecto (útil en local con imagen ya cargada, como en las pruebas
+# de hoy). En real, ArgoCD lo rellena con un Secret dockerconfigjson creado
+# aparte en el clúster (no en Git) — ver gitops/apps/car-api.yaml.
+imagePullSecrets: []
+
 # Ignorado si autoscaling.enabled es true (el HPA manda en ese caso)
 replicaCount: 1
 
