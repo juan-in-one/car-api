@@ -7,10 +7,12 @@ on:
     branches: [main]
 
 # Permiso explícito para que el GITHUB_TOKEN automático de esta ejecución
-# pueda publicar paquetes (imágenes) en GHCR. Por defecto viene en solo lectura.
+# pueda publicar paquetes (imágenes) en GHCR y subir hallazgos de Trivy a la
+# pestaña "Security" del repo. Por defecto viene en solo lectura.
 permissions:
   contents: read
   packages: write
+  security-events: write
 
 env:
   REGISTRY: ghcr.io
@@ -22,6 +24,24 @@ jobs:
     steps:
       - name: Descargar el código del repo
         uses: actions/checkout@v4
+
+      - name: Trivy — escaneo de configuración (Dockerfile + chart de Helm)
+        # "config" analiza IaC: malas prácticas de seguridad en el propio
+        # Dockerfile y en el chart de Helm (Trivy renderiza el chart él solo,
+        # no hace falta pasarle el YAML ya generado a mano).
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config.sarif
+          exit-code: "0" # no bloquea main todavía, ver comentario más abajo
+
+      - name: Subir hallazgos de configuración a la pestaña Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
 
       - name: Autenticarse en GHCR
         # Solo publicamos imagen cuando el trigger es un push (no en PRs, para
@@ -47,5 +67,26 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name == 'push' }}
+          # "load: true" deja la imagen cargada en el Docker del propio runner,
+          # así el siguiente paso puede escanearla sin tener que autenticarse
+          # contra GHCR ni volver a descargarla.
+          load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Trivy — escaneo de vulnerabilidades de la imagen
+        # "image" analiza CVEs conocidas en el sistema operativo base y en las
+        # dependencias Python instaladas dentro de la imagen ya construida.
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          format: sarif
+          output: trivy-image.sarif
+          exit-code: "0" # no bloquea main todavía, ver comentario más abajo
+
+      - name: Subir hallazgos de la imagen a la pestaña Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
