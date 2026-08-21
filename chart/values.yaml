@@ -49,9 +49,3 @@ resources:
   limits:
     cpu: 500m
     memory: 256Mi
-
-# Valor de desarrollo, igual al de .env.example. NO usar en real: la gestión de
-# secretos de verdad (Sealed Secrets / External Secrets / SOPS) llega en un paso
-# posterior del roadmap (ArgoCD + gestión de secretos).
-secret:
-  databaseUrl: "postgresql+asyncpg://car_api:car_api@localhost:5432/car_api"
