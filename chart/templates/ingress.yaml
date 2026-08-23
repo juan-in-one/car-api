@@ -5,6 +5,10 @@ metadata:
   name: {{ include "car-api.fullname" . }}
   labels:
     {{- include "car-api.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   {{- with .Values.ingress.className }}
   ingressClassName: {{ . }}
@@ -14,7 +18,7 @@ spec:
       http:
         paths:
           - path: {{ .Values.ingress.path }}
-            pathType: Prefix
+            pathType: {{ .Values.ingress.pathType | default "Prefix" }}
             backend:
               service:
                 name: {{ include "car-api.fullname" . }}

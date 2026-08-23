@@ -20,6 +20,12 @@ ingress:
   className: nginx
   host: car-api.local
   path: /
+  pathType: Prefix
+  # Vacío por defecto: la plataforma (gitops/apps/car-api.yaml) es quien
+  # decide bajo qué host/prefijo real se expone, y añade aquí las
+  # anotaciones de reescritura de path si hace falta (ver web/car-api/
+  # sport-api compartiendo un único Ingress fan-out).
+  annotations: {}
 
 autoscaling:
   enabled: true
