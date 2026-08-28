@@ -45,3 +45,12 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> 
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
     return event
+
+
+@app.delete("/maintenance-events/{event_id}", status_code=204)
+async def delete_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> None:
+    event = await db.get(MaintenanceEvent, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    await db.delete(event)
+    await db.commit()
