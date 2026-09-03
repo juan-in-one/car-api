@@ -34,8 +34,11 @@ metrics.set_meter_provider(
 meter = metrics.get_meter("car-api")
 
 # Auto-instrumentación: peticiones/latencia/status de TODAS las rutas, sin
-# tocar cada endpoint uno a uno.
-FastAPIInstrumentor.instrument_app(app)
+# tocar cada endpoint uno a uno. Se excluyen /health (sondas de Kubernetes,
+# cada 10s x2) y /metrics (el propio Prometheus scrapeándose a sí mismo cada
+# 30s) — si no, "ensucian" cualquier panel de tráfico real con ruido interno
+# que no es una petición de negocio.
+FastAPIInstrumentor.instrument_app(app, excluded_urls="/health,/metrics")
 
 # Monta el /metrics que lee el ServiceMonitor.
 app.mount("/metrics", make_asgi_app())
