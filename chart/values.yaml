@@ -27,6 +27,13 @@ ingress:
   # sport-api compartiendo un único Ingress fan-out).
   annotations: {}
 
+metrics:
+  # Crea un ServiceMonitor para que Prometheus scrapee /metrics (ver
+  # app/main.py). Requiere que el clúster tenga instalado kube-prometheus-
+  # stack (el CRD ServiceMonitor) — deshabilitar si se instala este chart en
+  # un clúster que no lo tenga.
+  enabled: true
+
 autoscaling:
   enabled: true
   minReplicas: 1

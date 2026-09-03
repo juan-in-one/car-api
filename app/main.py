@@ -1,6 +1,12 @@
 import uuid
 
 from fastapi import Depends, FastAPI, HTTPException
+from opentelemetry import metrics
+from opentelemetry.exporter.prometheus import PrometheusMetricReader
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.resources import Resource
+from prometheus_client import make_asgi_app
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +16,38 @@ from app.models import MaintenanceEvent
 from app.schemas import MaintenanceEventCreate, MaintenanceEventOut
 
 app = FastAPI(title=settings.app_name)
+
+# Métricas de aplicación con OpenTelemetry (mismo SDK que se reutilizará para
+# trazas en una fase posterior). El exportador de Prometheus expone las
+# métricas en formato texto en /metrics, dentro de esta misma app y puerto —
+# Prometheus las scrapea con un ServiceMonitor propio (chart/templates/
+# servicemonitor.yaml), sin ningún colector en medio.
+metrics.set_meter_provider(
+    MeterProvider(
+        metric_readers=[PrometheusMetricReader()],
+        # Identifica el servicio en las métricas (service_name) — sin esto
+        # sale "unknown_service", y hará falta para cruzar datos con logs/
+        # trazas en fases posteriores.
+        resource=Resource.create({"service.name": "car-api"}),
+    )
+)
+meter = metrics.get_meter("car-api")
+
+# Auto-instrumentación: peticiones/latencia/status de TODAS las rutas, sin
+# tocar cada endpoint uno a uno.
+FastAPIInstrumentor.instrument_app(app)
+
+# Monta el /metrics que lee el ServiceMonitor.
+app.mount("/metrics", make_asgi_app())
+
+# Métrica de negocio propia (no genérica): cuántos eventos de mantenimiento
+# se han creado de verdad, incrementada a mano justo donde ocurre el evento
+# (ver create_event más abajo) — la auto-instrumentación de arriba no sabe
+# qué significa esto, solo ve "una petición POST".
+maintenance_events_created = meter.create_counter(
+    name="car_maintenance_events_created_total",
+    description="Eventos de mantenimiento creados",
+)
 
 
 @app.on_event("startup")
@@ -30,6 +68,7 @@ async def create_event(
     db.add(event)
     await db.commit()
     await db.refresh(event)
+    maintenance_events_created.add(1)
     return event
 
 
