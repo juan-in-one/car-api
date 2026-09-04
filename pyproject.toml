@@ -14,3 +14,13 @@ select = ["E", "F", "I", "B"]
 # petición, no es el bug que la regla asume en Python normal. Desactivada
 # a propósito, no un descuido.
 ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Sin esto, pytest no encuentra el paquete "app" al hacer
+# "from app.main import app" dentro de conftest.py.
+pythonpath = ["."]
+# La app es async de punta a punta (SQLAlchemy async, FastAPI async def) —
+# "auto" hace que cada "async def test_..." se ejecute como test sin tener
+# que ponerle @pytest.mark.asyncio encima a cada uno, uno por uno.
+asyncio_mode = "auto"
