@@ -1,44 +1,58 @@
 import uuid
 
 from fastapi import Depends, FastAPI, HTTPException
-from opentelemetry import metrics
+from opentelemetry import metrics, trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from prometheus_client import make_asgi_app
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import get_db, init_db
+from app.database import engine, get_db, init_db
 from app.models import MaintenanceEvent
 from app.schemas import MaintenanceEventCreate, MaintenanceEventOut
 
 app = FastAPI(title=settings.app_name)
 
-# Métricas de aplicación con OpenTelemetry (mismo SDK que se reutilizará para
-# trazas en una fase posterior). El exportador de Prometheus expone las
-# métricas en formato texto en /metrics, dentro de esta misma app y puerto —
-# Prometheus las scrapea con un ServiceMonitor propio (chart/templates/
-# servicemonitor.yaml), sin ningún colector en medio.
+# Identifica el servicio tanto en métricas como en trazas — sin esto sale
+# "unknown_service", y hace falta para cruzar datos entre las dos.
+resource = Resource.create({"service.name": "car-api"})
+
+# Métricas (Fase B) — el exportador de Prometheus expone /metrics en esta
+# misma app y puerto; Prometheus las scrapea con su ServiceMonitor propio.
 metrics.set_meter_provider(
-    MeterProvider(
-        metric_readers=[PrometheusMetricReader()],
-        # Identifica el servicio en las métricas (service_name) — sin esto
-        # sale "unknown_service", y hará falta para cruzar datos con logs/
-        # trazas en fases posteriores.
-        resource=Resource.create({"service.name": "car-api"}),
-    )
+    MeterProvider(metric_readers=[PrometheusMetricReader()], resource=resource)
 )
 meter = metrics.get_meter("car-api")
 
-# Auto-instrumentación: peticiones/latencia/status de TODAS las rutas, sin
-# tocar cada endpoint uno a uno. Se excluyen /health (sondas de Kubernetes,
-# cada 10s x2) y /metrics (el propio Prometheus scrapeándose a sí mismo cada
-# 30s) — si no, "ensucian" cualquier panel de tráfico real con ruido interno
-# que no es una petición de negocio.
+# Trazas (Fase D) — a diferencia de las métricas, aquí no hay nadie
+# "scrapeando": el exportador empuja (push) cada traza a Alloy vía OTLP, que
+# la reenvía a Tempo. "insecure=True": tráfico interno del clúster, sin TLS.
+trace.set_tracer_provider(TracerProvider(resource=resource))
+trace.get_tracer_provider().add_span_processor(
+    BatchSpanProcessor(
+        OTLPSpanExporter(endpoint="alloy.monitoring.svc.cluster.local:4317", insecure=True)
+    )
+)
+
+# Auto-instrumentación de FastAPI: genera métricas Y trazas (una por cada
+# proveedor que haya configurado arriba) para todas las rutas, sin tocar
+# cada endpoint uno a uno. excluded_urls igual que antes.
 FastAPIInstrumentor.instrument_app(app, excluded_urls="/health,/metrics")
+
+# Instrumenta también las consultas a Postgres: cada una aparece como un
+# span "hijo" dentro de la traza de la petición HTTP que la disparó —
+# engine.sync_engine porque la instrumentación engancha eventos de
+# SQLAlchemy que viven en el motor síncrono interno, incluso usando el
+# engine async por fuera.
+SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
 
 # Monta el /metrics que lee el ServiceMonitor.
 app.mount("/metrics", make_asgi_app())
