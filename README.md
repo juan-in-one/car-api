@@ -30,3 +30,5 @@ API disponible en `http://localhost:8000` (docs interactivas en `/docs`).
 - `POST /maintenance-events`
 - `GET /maintenance-events`
 - `GET /maintenance-events/{id}`
+
+<!-- verificacion final: merge real dispara ci -->
