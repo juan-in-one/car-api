@@ -24,3 +24,9 @@ pythonpath = ["."]
 # "auto" hace que cada "async def test_..." se ejecute como test sin tener
 # que ponerle @pytest.mark.asyncio encima a cada uno, uno por uno.
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+# La Action que comenta la cobertura en la PR necesita rutas relativas en
+# el informe (".coverage"), no absolutas — sin esto falla al leerlo,
+# aunque pytest --cov haya ido bien.
+relative_files = true
