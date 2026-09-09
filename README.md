@@ -30,3 +30,4 @@ API disponible en `http://localhost:8000` (docs interactivas en `/docs`).
 - `POST /maintenance-events`
 - `GET /maintenance-events`
 - `GET /maintenance-events/{id}`
+<!-- prueba real: ci y pr-checks separados -->
