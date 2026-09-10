@@ -4,7 +4,18 @@ Microservicio de la plataforma [juan-in-one](https://github.com/juan-in-one) —
 (cambios de aceite, ITV, distribución, kilometraje).
 
 Stack: Python + FastAPI + SQLAlchemy (async) + PostgreSQL. Instrumentado con OpenTelemetry (métricas +
-trazas) desde el primer commit.
+trazas, `SQLAlchemyInstrumentor` incluido — cada consulta a Postgres aparece como span hijo de la petición
+HTTP) desde el primer commit.
+
+Es el primer microservicio de la plataforma, elegido a propósito por ser el más simple (CRUD sobre datos
+propios, sin dependencias externas) — sirvió para validar el pipeline completo de punta a punta
+(GitOps + CI/CD + observabilidad + firma de imágenes) antes de replicar el patrón en `sport-api` y
+`academy-api`.
+
+## Modelo de datos
+
+Un único tipo, **`MaintenanceEvent`**: un evento de mantenimiento (`type`: `oil_change` / `itv` /
+`timing_belt` / `other`), con fecha, kilometraje y notas libres.
 
 ## Desarrollo local
 
